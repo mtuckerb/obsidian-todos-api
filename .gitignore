@@ -1,0 +1,23 @@
+# Node
+node_modules
+package-lock.json
+
+# Build
+main.js
+main.js.map
+*.js.map
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Development
+.env
+.env.local

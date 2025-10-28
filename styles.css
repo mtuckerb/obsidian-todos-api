@@ -1,0 +1,21 @@
+/* Styles for the Todos REST API plugin */
+
+/* Add any custom styling here if needed */
+/* This plugin primarily works through REST API, so minimal styling is required */
+
+.todos-api-status {
+	display: inline-block;
+	padding: 2px 6px;
+	border-radius: 3px;
+	font-size: 0.9em;
+}
+
+.todos-api-status.active {
+	background-color: var(--interactive-success);
+	color: var(--text-on-accent);
+}
+
+.todos-api-status.error {
+	background-color: var(--interactive-critical);
+	color: var(--text-on-accent);
+}
