@@ -2,8 +2,13 @@ name: Release Obsidian Plugin
 
 on:
   push:
-    tags:
-      - '*'
+    branches:
+      - main
+      - '[0-9]+.[0-9]+.[0-9]+'
+    paths:
+      - 'manifest.json'
+      - 'versions.json'
+      - 'package.json'
 
 jobs:
   build:
@@ -22,12 +27,32 @@ jobs:
           npm install
           npm run build
       
+      - name: Get version from manifest
+        id: version
+        run: |
+          version=$(cat manifest.json | grep -Po '"version": *"\K[^"]*')
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "Version: $version"
+      
+      - name: Check if release exists
+        id: check_release
+        run: |
+          if gh release view "${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
       - name: Create release
+        if: steps.check_release.outputs.exists == 'false'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          tag="${GITHUB_REF#refs/tags/}"
-          gh release create "$tag" \
-            --title="Release $tag" \
+          version="${{ steps.version.outputs.version }}"
+          gh release create "$version" \
+            --title="Release $version" \
             --draft \
+            --target="${GITHUB_REF#refs/heads/}" \
             main.js manifest.json styles.css
