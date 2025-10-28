@@ -1,5 +1,16 @@
-import { Plugin } from 'obsidian';
+import { App, Plugin } from 'obsidian';
 import { getAPI } from 'obsidian-local-rest-api';
+
+// Extend the Obsidian App type to include plugins
+interface ObsidianApp extends App {
+	plugins: {
+		plugins: {
+			dataview?: {
+				api: any;
+			};
+		};
+	};
+}
 
 export default class TodosApiPlugin extends Plugin {
 	private api: any;
@@ -18,7 +29,8 @@ export default class TodosApiPlugin extends Plugin {
 		this.api.addRoute('/todos/').get(async (request: any, response: any) => {
 			try {
 				// Check if Dataview is available
-				const dataviewPlugin = this.app.plugins.plugins.dataview;
+				const app = this.app as ObsidianApp;
+				const dataviewPlugin = app.plugins.plugins.dataview;
 				if (!dataviewPlugin) {
 					return response.status(503).json({
 						error: 'Dataview plugin not found',
