@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-todos-api",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"description": "Obsidian plugin to expose todos via REST API",
 	"main": "main.js",
 	"scripts": {
@@ -8,7 +8,14 @@
 		"build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
 		"version": "node version-bump.mjs && git add manifest.json versions.json"
 	},
-	"keywords": ["obsidian", "obsidian-plugin", "todos", "tasks", "rest-api", "dataview"],
+	"keywords": [
+		"obsidian",
+		"obsidian-plugin",
+		"todos",
+		"tasks",
+		"rest-api",
+		"dataview"
+	],
 	"author": "mtuckerb",
 	"license": "MIT",
 	"devDependencies": {
