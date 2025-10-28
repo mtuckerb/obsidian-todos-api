@@ -1,10 +1,10 @@
 import { App, Plugin } from 'obsidian';
-import { getAPI } from 'obsidian-local-rest-api';
 
 // Extend the Obsidian App type to include plugins
 interface ObsidianApp extends App {
 	plugins: {
 		plugins: {
+			'obsidian-local-rest-api'?: any;
 			dataview?: {
 				api: any;
 			};
@@ -12,16 +12,32 @@ interface ObsidianApp extends App {
 	};
 }
 
+// Type definitions for the Local REST API
+interface LocalRestApiPublicApi {
+	addRoute(path: string): any; // Express IRoute
+	unregister(): void;
+}
+
 export default class TodosApiPlugin extends Plugin {
-	private api: any;
+	private api: LocalRestApiPublicApi;
 
 	async onload() {
 		console.log('Loading Todos REST API plugin');
 
-		// Get the Local REST API
-		this.api = getAPI(this.app, this.manifest);
-		if (!this.api) {
+		// Access the local-rest-api plugin directly instead of importing
+		const app = this.app as ObsidianApp;
+		const localRestApiPlugin = app.plugins.plugins['obsidian-local-rest-api'];
+		
+		if (!localRestApiPlugin) {
 			console.error('Local REST API plugin is not available');
+			return;
+		}
+
+		// Call getPublicApi method on the plugin
+		this.api = localRestApiPlugin.getPublicApi(this.manifest);
+		
+		if (!this.api) {
+			console.error('Failed to get Local REST API');
 			return;
 		}
 
@@ -137,6 +153,9 @@ export default class TodosApiPlugin extends Plugin {
 	}
 
 	onunload() {
+		if (this.api) {
+			this.api.unregister();
+		}
 		console.log('Unloading Todos REST API plugin');
 	}
 }
