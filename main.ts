@@ -1,5 +1,6 @@
 import { App, Plugin } from 'obsidian';
 
+
 // Extend the Obsidian App type to include plugins
 interface ObsidianApp extends App {
 	plugins: {

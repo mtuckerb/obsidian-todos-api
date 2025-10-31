@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-todos-api",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "Obsidian plugin to expose todos via REST API",
 	"main": "main.js",
 	"scripts": {
@@ -25,7 +25,7 @@
 		"builtin-modules": "3.3.0",
 		"esbuild": "0.17.3",
 		"obsidian": "latest",
-		"obsidian-local-rest-api": "github:coddingtonbear/obsidian-local-rest-api",
+		"obsidian-local-rest-api": "latest",
 		"tslib": "2.4.0",
 		"typescript": "^5.9.3"
 	}
