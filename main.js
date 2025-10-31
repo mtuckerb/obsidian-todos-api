@@ -28,9 +28,16 @@ __export(main_exports, {
 });
 module.exports = __toCommonJS(main_exports);
 var import_obsidian = require("obsidian");
+var DEFAULT_SETTINGS = {
+  defaultSection: "# Observations",
+  dailyNotesPath: "Daily Notes",
+  excludedDirectories: "Timeless,Archive"
+};
 var TodosApiPlugin = class extends import_obsidian.Plugin {
   async onload() {
     console.log("Loading Todos REST API plugin");
+    await this.loadSettings();
+    this.addSettingTab(new TodosApiSettingTab(this.app, this));
     const app = this.app;
     const localRestApiPlugin = app.plugins.plugins["obsidian-local-rest-api"];
     if (!localRestApiPlugin) {
@@ -43,6 +50,7 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
       return;
     }
     this.api.addRoute("/todos/").get(async (request, response) => {
+      var _a;
       try {
         const app2 = this.app;
         const dataviewPlugin = app2.plugins.plugins.dataview;
@@ -77,6 +85,8 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
         const filterCompleted = params.get("completed");
         const filterPath = params.get("path");
         const filterTag = params.get("tag");
+        const filterStatus = params.get("status");
+        const excludeDirs = ((_a = params.get("exclude")) == null ? void 0 : _a.split(",").map((d) => d.trim())) || this.settings.excludedDirectories.split(",").map((d) => d.trim());
         let filteredTasks = tasks;
         if (filterCompleted !== null) {
           const showCompleted = filterCompleted === "true";
@@ -92,6 +102,14 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
             (task) => task.tags && task.tags.some((tag) => tag.includes(filterTag))
           );
         }
+        if (filterStatus) {
+          filteredTasks = filteredTasks.filter((task) => task.status === filterStatus);
+        }
+        if (excludeDirs && excludeDirs.length > 0 && excludeDirs[0] !== "") {
+          filteredTasks = filteredTasks.filter(
+            (task) => !excludeDirs.some((dir) => task.path.startsWith(dir))
+          );
+        }
         return response.status(200).json({
           count: filteredTasks.length,
           tasks: filteredTasks
@@ -104,7 +122,113 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
         });
       }
     });
-    console.log("Todos REST API route registered at /todos/");
+    this.api.addRoute("/todos/").post(async (request, response) => {
+      try {
+        const app2 = this.app;
+        const body = request.body;
+        const text = body.text;
+        const status = body.status || " ";
+        const filePath = body.path || this.getCurrentDailyNotePath();
+        if (!text) {
+          return response.status(400).json({
+            error: "Missing required field",
+            message: "Text field is required"
+          });
+        }
+        let file = app2.vault.getAbstractFileByPath(filePath);
+        if (!file) {
+          return response.status(404).json({
+            error: "File not found",
+            message: `Could not find file: ${filePath}`
+          });
+        }
+        if (!(file instanceof import_obsidian.TFile)) {
+          return response.status(400).json({
+            error: "Invalid path",
+            message: `Path is not a file: ${filePath}`
+          });
+        }
+        const content = await app2.vault.read(file);
+        const sectionHeader = this.settings.defaultSection;
+        if (!content.includes(sectionHeader)) {
+          return response.status(400).json({
+            error: "Section not found",
+            message: `Could not find "${sectionHeader}" section in the file`
+          });
+        }
+        const taskLine = `	- [${status}] ${text}`;
+        const lines = content.split("\n");
+        const sectionIndex = lines.findIndex((line) => line.trim() === sectionHeader);
+        lines.splice(sectionIndex + 1, 0, taskLine);
+        const newContent = lines.join("\n");
+        await app2.vault.modify(file, newContent);
+        return response.status(201).json({
+          message: "Todo added successfully",
+          path: filePath,
+          text
+        });
+      } catch (error) {
+        console.error("Error adding todo:", error);
+        return response.status(500).json({
+          error: "Internal server error",
+          message: error.message
+        });
+      }
+    });
+    this.api.addRoute("/todos/").patch(async (request, response) => {
+      try {
+        const app2 = this.app;
+        const body = request.body;
+        const path = body.path;
+        const oldText = body.oldText;
+        const newText = body.newText;
+        const oldStatus = body.oldStatus || " ";
+        const newStatus = body.newStatus || oldStatus;
+        if (!path || !oldText || !newText) {
+          return response.status(400).json({
+            error: "Missing required fields",
+            message: "path, oldText, and newText are required"
+          });
+        }
+        const file = app2.vault.getAbstractFileByPath(path);
+        if (!file) {
+          return response.status(404).json({
+            error: "File not found",
+            message: `Could not find file: ${path}`
+          });
+        }
+        if (!(file instanceof import_obsidian.TFile)) {
+          return response.status(400).json({
+            error: "Invalid path",
+            message: `Path is not a file: ${path}`
+          });
+        }
+        const content = await app2.vault.read(file);
+        const oldTaskLine = `	- [${oldStatus}] ${oldText}`;
+        if (!content.includes(oldTaskLine)) {
+          return response.status(404).json({
+            error: "Task not found",
+            message: "The specified task could not be found (it may have been modified)"
+          });
+        }
+        const newTaskLine = `	- [${newStatus}] ${newText}`;
+        const newContent = content.replace(oldTaskLine, newTaskLine);
+        await app2.vault.modify(file, newContent);
+        return response.status(200).json({
+          message: "Todo updated successfully",
+          path,
+          oldText,
+          newText
+        });
+      } catch (error) {
+        console.error("Error updating todo:", error);
+        return response.status(500).json({
+          error: "Internal server error",
+          message: error.message
+        });
+      }
+    });
+    console.log("Todos REST API routes registered at /todos/");
   }
   /**
    * Flatten the Grouping structure returned by Dataview into a simple array of tasks.
@@ -126,10 +250,47 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
     }
     return tasks;
   }
+  /**
+   * Get the current daily note path
+   * @returns The path to the current daily note
+   */
+  getCurrentDailyNotePath() {
+    const today = new Date().toISOString().split("T")[0];
+    return `${this.settings.dailyNotesPath}/${today}.md`;
+  }
+  async loadSettings() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+  }
+  async saveSettings() {
+    await this.saveData(this.settings);
+  }
   onunload() {
     if (this.api) {
       this.api.unregister();
     }
     console.log("Unloading Todos REST API plugin");
+  }
+};
+var TodosApiSettingTab = class extends import_obsidian.PluginSettingTab {
+  constructor(app, plugin) {
+    super(app, plugin);
+    this.plugin = plugin;
+  }
+  display() {
+    const { containerEl } = this;
+    containerEl.empty();
+    containerEl.createEl("h2", { text: "Todos API Settings" });
+    new import_obsidian.Setting(containerEl).setName("Default section").setDesc("The section header where new todos will be added").addText((text) => text.setPlaceholder("# Observations").setValue(this.plugin.settings.defaultSection).onChange(async (value) => {
+      this.plugin.settings.defaultSection = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("Daily notes path").setDesc("The folder path where daily notes are stored").addText((text) => text.setPlaceholder("Daily Notes").setValue(this.plugin.settings.dailyNotesPath).onChange(async (value) => {
+      this.plugin.settings.dailyNotesPath = value;
+      await this.plugin.saveSettings();
+    }));
+    new import_obsidian.Setting(containerEl).setName("Excluded directories").setDesc("Comma-separated list of directories to exclude from todos list").addText((text) => text.setPlaceholder("Timeless,Archive").setValue(this.plugin.settings.excludedDirectories).onChange(async (value) => {
+      this.plugin.settings.excludedDirectories = value;
+      await this.plugin.saveSettings();
+    }));
   }
 };
