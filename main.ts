@@ -1,4 +1,4 @@
-import { App, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 
 // Plugin settings interface
 interface TodosApiSettings {
@@ -183,6 +183,12 @@ export default class TodosApiPlugin extends Plugin {
 						message: `Could not find file: ${filePath}`
 					});
 				}
+				if (!(file instanceof TFile)) {
+					return response.status(400).json({
+						error: 'Invalid path',
+						message: `Path is not a file: ${filePath}`
+					});
+				}
 
 				// Read the file content
 				const content = await app.vault.read(file);
@@ -252,6 +258,12 @@ export default class TodosApiPlugin extends Plugin {
 					return response.status(404).json({
 						error: 'File not found',
 						message: `Could not find file: ${path}`
+					});
+				}
+				if (!(file instanceof TFile)) {
+					return response.status(400).json({
+						error: 'Invalid path',
+						message: `Path is not a file: ${path}`
 					});
 				}
 
