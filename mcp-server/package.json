@@ -1,6 +1,6 @@
 {
   "name": "obsidian-todos-mcp-server",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "MCP server for interacting with Obsidian todos via REST API",
   "type": "module",
   "main": "dist/index.js",
