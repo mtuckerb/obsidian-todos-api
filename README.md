@@ -2,6 +2,10 @@
 
 This Obsidian plugin extends the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin to expose todos/tasks via a REST endpoint using the Dataview plugin's API.
 
+## 🚀 MCP Server Available!
+
+This plugin now includes an **MCP (Model Context Protocol) server** that lets AI assistants like Claude Desktop directly manage your Obsidian todos! See the [`mcp-server/`](./mcp-server/) directory for installation and usage instructions.
+
 ## Prerequisites
 
 - [Obsidian](https://obsidian.md/) installed
