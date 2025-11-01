@@ -3,11 +3,11 @@ on:
   push:
     branches:
       - main
-      - '[0-9]+.[0-9]+.[0-9]+'
+      - "[0-9]+.[0-9]+.[0-9]+"
     paths:
-      - 'manifest.json'
-      - 'versions.json'
-      - 'package.json'
+      - "manifest.json"
+      - "versions.json"
+      - "package.json"
 
 permissions:
   contents: write
@@ -22,23 +22,17 @@ jobs:
       - name: Use Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18.x'
+          node-version: "18.x"
 
       - name: Build main plugin
         run: |
           npm install
           npm run build
 
-      - name: Build MCP server
-        run: |
-          cd mcp-server
-          npm install
-          npm run build
-
       - name: Get version from manifest
         id: version
         run: |
-          version=$(cat manifest.json | grep -Po '\"version\": *\"\\K[^\"]*')
+          version=$(cat manifest.json | grep -Po "\\\"version\\\": *\\\"\\\\K[^\\\"]*")
           echo "version=$version" >> $GITHUB_OUTPUT
           echo "Version: $version"
 
@@ -54,7 +48,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Create tag and release
-        if: steps.check_release.outputs.exists == 'false'
+        if: steps.check_release.outputs.exists == "false"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -63,7 +57,7 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag "$version"
           git push origin "$version"
-          gh release create "$version" \
-            --title="Release $version" \
-            --draft \
+          gh release create "$version" \\
+            --title="Release $version" \\
+            --draft \\
             main.js manifest.json styles.css
