@@ -122,6 +122,41 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
         });
       }
     });
+    this.api.addRoute("/due-dates").post(async (request, response) => {
+      var _a;
+      try {
+        const app2 = this.app;
+        const dataviewApi = (_a = app2.plugins.plugins["dataview"]) == null ? void 0 : _a.api;
+        if (!dataviewApi) {
+          return response.status(500).json({
+            error: "Dataview plugin not loaded",
+            message: "Dataview plugin may not be fully loaded"
+          });
+        }
+        const body = request.body;
+        const courseId = body.courseId;
+        const start = body.start;
+        const end = body.end;
+        const query = body.query || "";
+        const dataViewIntegration = body.dataViewIntegration !== false;
+        const entries = await this.processDueDates(app2, dataviewApi, {
+          courseId,
+          start,
+          end,
+          query
+        });
+        return response.status(200).json({
+          count: entries.length,
+          entries
+        });
+      } catch (error) {
+        console.error("Error processing due dates:", error);
+        return response.status(500).json({
+          error: "Internal server error",
+          message: error.message
+        });
+      }
+    });
     this.api.addRoute("/todos/").post(async (request, response) => {
       try {
         const app2 = this.app;
@@ -249,6 +284,79 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
       }
     }
     return tasks;
+  }
+  /**
+   * Process due dates using the logic from processDueDates.js
+   * Implements course filtering, date range filtering, and markdown table parsing
+   */
+  async processDueDates(app, dataviewApi, params) {
+    const { courseId, start, end, query } = params;
+    const entries = [];
+    const startDate = start || new Date().toISOString().split("T")[0];
+    const endDate = end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
+    let dvQuery = "TABLE file.path, file.name, file.course_id";
+    if (courseId) {
+      dvQuery += ` WHERE file.course_id = "${courseId}"`;
+    }
+    const result = await dataviewApi.query(dvQuery);
+    if (!result.successful) {
+      console.error("Dataview query failed:", result.error);
+      return [];
+    }
+    for (const page of result.value.values) {
+      if (!page["file.path"])
+        continue;
+      try {
+        const file = app.vault.getAbstractFileByPath(page["file.path"]);
+        if (!(file instanceof import_obsidian.TFile))
+          continue;
+        const content = await app.vault.read(file);
+        const regex = /# Due Dates([\s\S]*?)(?=\n#|$)/;
+        const matches = content.match(regex);
+        if (!matches)
+          continue;
+        const tableData = matches[1].trim();
+        const lines = tableData.split("\n").slice(1);
+        for (const line of lines) {
+          const columns = line.split("|").map((c) => c.trim()).filter((c) => c);
+          if (columns.length < 2)
+            continue;
+          let [dueDate, assignment] = columns;
+          if (!Date.parse(dueDate) || (assignment == null ? void 0 : assignment.includes("\u2705"))) {
+            continue;
+          }
+          const dueDateObj = new Date(dueDate);
+          const startObj = new Date(startDate);
+          const endObj = new Date(endDate);
+          if (dueDateObj < startObj || dueDateObj > endObj) {
+            continue;
+          }
+          if (query && !assignment.toLowerCase().includes(query.toLowerCase())) {
+            continue;
+          }
+          const formattedAssignment = assignment.match(/[A-Z]{3}-[0-9]{3}/) ? assignment : `#${page["file.course_id"] || courseId || "unknown"} - ${assignment}`;
+          const now = new Date();
+          const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1e3);
+          const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1e3);
+          let formattedDueDate = dueDate;
+          if (dueDateObj > oneWeekAgo) {
+            formattedDueDate = `<span class="due one_week">${dueDate}</span>`;
+          } else if (dueDateObj > twoWeeksAgo) {
+            formattedDueDate = `<span class="due two_weeks">${dueDate}</span>`;
+          }
+          entries.push({
+            dueDate,
+            formattedDueDate,
+            assignment: formattedAssignment,
+            filePath: page["file.path"]
+          });
+        }
+      } catch (error) {
+        console.error(`Error processing file ${page["file.path"]}:`, error);
+      }
+    }
+    entries.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    return entries;
   }
   /**
    * Get the current daily note path
