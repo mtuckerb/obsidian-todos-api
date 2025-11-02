@@ -161,7 +161,8 @@ export default class TodosApiPlugin extends Plugin {
 		// Register GET /due-dates route for looking up due dates with optional filters
 		this.api.addRoute('/due-dates').get(async (request: any, response: any) => {
 			try {
-				const dataviewApi = this.plugin.app.plugins.plugins['dataview']?.api;
+				const app = this.app as ObsidianApp;
+				const dataviewApi = app.plugins.plugins['dataview']?.api;
 				if (!dataviewApi) {
 					return response.status(500).json({
 						error: 'Dataview plugin not loaded',
