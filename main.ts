@@ -158,8 +158,8 @@ export default class TodosApiPlugin extends Plugin {
 
 		// Register POST /todos route for adding todos
 
-		// Register GET /due-dates route for looking up due dates with optional filters
-		this.api.addRoute('/due-dates').get(async (request: any, response: any) => {
+		// Register POST /due-dates route for DataView-based due dates processing
+		this.api.addRoute('/due-dates').post(async (request: any, response: any) => {
 			try {
 				const app = this.app as ObsidianApp;
 				const dataviewApi = app.plugins.plugins['dataview']?.api;
@@ -170,40 +170,30 @@ export default class TodosApiPlugin extends Plugin {
 					});
 				}
 
-				const params = new URLSearchParams(request.url.split('?')[1] || '');
-				const startDate = params.get('startDate');
-				const endDate = params.get('endDate');
-				const query = params.get('query') || '';
+				// Parse request body with DataView integration parameters
+				const body = request.body;
+				const courseId = body.courseId;
+				const start = body.start;
+				const end = body.end;
+				const query = body.query || '';
+				const dataViewIntegration = body.dataViewIntegration !== false;
 
-				// Build Dataview query string
-				let dvQuery = `TABLE file.link AS file, due AS dueDate WHERE contains(section, "Due Dates")`;
-				if (startDate) {
-					dvQuery += ` AND due >= date("${startDate}")`;
-				}
-				if (endDate) {
-					dvQuery += ` AND due <= date("${endDate}")`;
-				}
-				if (query) {
-					dvQuery += ` AND contains(tags, "${query}")`;
-				}
+				// Implement processDueDates.js logic
+				const entries = await this.processDueDates(app, dataviewApi, {
+					courseId,
+					start,
+					end,
+					query
+				});
 
-				const result = await dataviewApi.query(dvQuery);
-
-				if (!result.successful) {
-					return response.status(500).json({
-						error: 'Query failed',
-						message: result.error
-					});
-				}
-
-				// Return the query results
+				// Return the processed entries
 				return response.status(200).json({
-					count: result.value.values.length,
-					results: result.value.values
+					count: entries.length,
+					entries: entries
 				});
 
 			} catch (error) {
-				console.error('Error fetching due dates:', error);
+				console.error('Error processing due dates:', error);
 				return response.status(500).json({
 					error: 'Internal server error',
 					message: error.message
@@ -388,6 +378,121 @@ export default class TodosApiPlugin extends Plugin {
 		}
 
 		return tasks;
+	}
+
+	/**
+	 * Process due dates using the logic from processDueDates.js
+	 * Implements course filtering, date range filtering, and markdown table parsing
+	 */
+	private async processDueDates(app: ObsidianApp, dataviewApi: any, params: {
+		courseId?: string;
+		start?: string;
+		end?: string;
+		query?: string;
+	}): Promise<any[]> {
+		const { courseId, start, end, query } = params;
+		const entries: any[] = [];
+
+		// Determine the start and end dates using your processDueDates.js logic
+		const startDate = start || new Date().toISOString().split('T')[0];
+		const endDate = end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+		// Build the DataView query for course pages
+		let dvQuery = 'TABLE file.path, file.name, file.course_id';
+		if (courseId) {
+			dvQuery += ` WHERE file.course_id = "${courseId}"`;
+		}
+		
+		const result = await dataviewApi.query(dvQuery);
+		if (!result.successful) {
+			console.error('Dataview query failed:', result.error);
+			return [];
+		}
+
+		// Process each page that matches the course filter
+		for (const page of result.value.values) {
+			if (!page['file.path']) continue;
+
+			try {
+				// Read the file content to parse the markdown table
+				const file = app.vault.getAbstractFileByPath(page['file.path']);
+				if (!(file instanceof TFile)) continue;
+
+				const content = await app.vault.read(file);
+				
+				// Parse the # Due Dates section using your regex pattern
+				const regex = /# Due Dates([\s\S]*?)(?=\n#|$)/;
+				const matches = content.match(regex);
+				
+				if (!matches) continue;
+
+				const tableData = matches[1].trim();
+				const lines = tableData.split('\n').slice(1); // Skip header row
+
+				for (const line of lines) {
+					const columns = line
+						.split('|')
+						.map(c => c.trim())
+						.filter(c => c);
+
+					if (columns.length < 2) continue;
+
+					let [dueDate, assignment] = columns;
+					
+					// Skip invalid dates and completed items (✅)
+					if (!Date.parse(dueDate) || assignment?.includes('✅')) {
+						continue;
+					}
+
+					// Apply date filtering
+					const dueDateObj = new Date(dueDate);
+					const startObj = new Date(startDate);
+					const endObj = new Date(endDate);
+
+					if (dueDateObj < startObj || dueDateObj > endObj) {
+						continue;
+					}
+
+					// Apply query filtering
+					if (query && !assignment.toLowerCase().includes(query.toLowerCase())) {
+						continue;
+					}
+
+					// Format assignment with course prefix (from your logic)
+					const formattedAssignment = assignment.match(/[A-Z]{3}-[0-9]{3}/)
+						? assignment
+						: `#${page['file.course_id'] || courseId || 'unknown'} - ${assignment}`;
+
+					// Format due date based on your logic
+					const now = new Date();
+					const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+					const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+					let formattedDueDate = dueDate;
+					if (dueDateObj > oneWeekAgo) {
+						formattedDueDate = `<span class="due one_week">${dueDate}</span>`;
+					} else if (dueDateObj > twoWeeksAgo) {
+						formattedDueDate = `<span class="due two_weeks">${dueDate}</span>`;
+					}
+
+					// Add the entry
+					entries.push({
+						dueDate,
+						formattedDueDate,
+						assignment: formattedAssignment,
+						filePath: page['file.path']
+					});
+				}
+
+			} catch (error) {
+				console.error(`Error processing file ${page['file.path']}:`, error);
+			}
+		}
+
+		// Sort by due date
+		entries.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+
+		return entries;
 	}
 
 	/**
