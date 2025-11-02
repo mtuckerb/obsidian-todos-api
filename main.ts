@@ -157,6 +157,59 @@ export default class TodosApiPlugin extends Plugin {
 		});
 
 		// Register POST /todos route for adding todos
+
+		// Register GET /due-dates route for looking up due dates with optional filters
+		this.api.addRoute('/due-dates').get(async (request: any, response: any) => {
+			try {
+				const dataviewApi = this.plugin.app.plugins.plugins['dataview']?.api;
+				if (!dataviewApi) {
+					return response.status(500).json({
+						error: 'Dataview plugin not loaded',
+						message: 'Dataview plugin may not be fully loaded'
+					});
+				}
+
+				const params = new URLSearchParams(request.url.split('?')[1] || '');
+				const startDate = params.get('startDate');
+				const endDate = params.get('endDate');
+				const query = params.get('query') || '';
+
+				// Build Dataview query string
+				let dvQuery = `TABLE file.link AS file, due AS dueDate WHERE contains(section, "Due Dates")`;
+				if (startDate) {
+					dvQuery += ` AND due >= date("${startDate}")`;
+				}
+				if (endDate) {
+					dvQuery += ` AND due <= date("${endDate}")`;
+				}
+				if (query) {
+					dvQuery += ` AND contains(tags, "${query}")`;
+				}
+
+				const result = await dataviewApi.query(dvQuery);
+
+				if (!result.successful) {
+					return response.status(500).json({
+						error: 'Query failed',
+						message: result.error
+					});
+				}
+
+				// Return the query results
+				return response.status(200).json({
+					count: result.value.values.length,
+					results: result.value.values
+				});
+
+			} catch (error) {
+				console.error('Error fetching due dates:', error);
+				return response.status(500).json({
+					error: 'Internal server error',
+					message: error.message
+				});
+			}
+		});
+
 		this.api.addRoute('/todos/').post(async (request: any, response: any) => {
 			try {
 				const app = this.app as ObsidianApp;
