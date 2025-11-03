@@ -11,13 +11,13 @@ else
     exit 1
 fi
 
-echo "Creating Git tag for version 1.1.11..."
+echo "Creating Git tag for version 1.1.12..."
 git add .
-git commit -m "Release v1.1.11 - Fixed moment.js import and enhanced release workflow"
-git tag v1.1.11
+git commit -m "Release v1.1.12 - Fixed moment.js import and enhanced release workflow"
+git tag v1.1.12
 
-echo "Tag created: v1.1.11"
+echo "Tag created: v1.1.12"
 echo "To complete the release:"
 echo "1. git push origin main"
-echo "2. git push origin v1.1.11"
+echo "2. git push origin v1.1.12"
 echo "3. GitHub Actions will automatically create the release with assets"
