@@ -123,13 +123,19 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
       }
     });
     this.api.addRoute("/due-dates").post(async (request, response) => {
-      var _a;
       try {
         const app2 = this.app;
-        const dataviewApi = (_a = app2.plugins.plugins["dataview"]) == null ? void 0 : _a.api;
+        const dataviewPlugin = app2.plugins.plugins.dataview;
+        if (!dataviewPlugin) {
+          return response.status(503).json({
+            error: "Dataview plugin not found",
+            message: "Please install and enable the Dataview plugin"
+          });
+        }
+        const dataviewApi = dataviewPlugin.api;
         if (!dataviewApi) {
-          return response.status(500).json({
-            error: "Dataview plugin not loaded",
+          return response.status(503).json({
+            error: "Dataview API not available",
             message: "Dataview plugin may not be fully loaded"
           });
         }
@@ -137,8 +143,7 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
         const courseId = body.courseId;
         const start = body.start;
         const end = body.end;
-        const query = body.query || "";
-        const dataViewIntegration = body.dataViewIntegration !== false;
+        const query = body.query || '""';
         const entries = await this.processDueDates(app2, dataviewApi, {
           courseId,
           start,
@@ -294,11 +299,10 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
     const entries = [];
     const startDate = start || new Date().toISOString().split("T")[0];
     const endDate = end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
-    let dvQuery = "TABLE file.path, file.name, file.course_id";
-    if (courseId) {
-      dvQuery += ` WHERE file.course_id = "${courseId}"`;
-    }
+    let dvQuery = `TABLE file.path, file.name, file.course_id WHERE ${query}`;
+    console.log("Dataview Query:", dvQuery);
     const result = await dataviewApi.query(dvQuery);
+    console.log("Dataview Result:", result);
     if (!result.successful) {
       console.error("Dataview query failed:", result.error);
       return [];

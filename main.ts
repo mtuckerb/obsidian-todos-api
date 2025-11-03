@@ -162,10 +162,20 @@ export default class TodosApiPlugin extends Plugin {
 		this.api.addRoute('/due-dates').post(async (request: any, response: any) => {
 			try {
 				const app = this.app as ObsidianApp;
-				const dataviewApi = app.plugins.plugins['dataview']?.api;
+				
+				// Check if Dataview plugin is available
+				const dataviewPlugin = app.plugins.plugins.dataview;
+				if (!dataviewPlugin) {
+					return response.status(503).json({
+						error: 'Dataview plugin not found',
+						message: 'Please install and enable the Dataview plugin'
+					});
+				}
+
+				const dataviewApi = dataviewPlugin.api;
 				if (!dataviewApi) {
-					return response.status(500).json({
-						error: 'Dataview plugin not loaded',
+					return response.status(503).json({
+						error: 'Dataview API not available',
 						message: 'Dataview plugin may not be fully loaded'
 					});
 				}
@@ -175,8 +185,7 @@ export default class TodosApiPlugin extends Plugin {
 				const courseId = body.courseId;
 				const start = body.start;
 				const end = body.end;
-				const query = body.query || '';
-				const dataViewIntegration = body.dataViewIntegration !== false;
+				const query = body.query || '""';
 
 				// Implement processDueDates.js logic
 				const entries = await this.processDueDates(app, dataviewApi, {
@@ -398,12 +407,12 @@ export default class TodosApiPlugin extends Plugin {
 		const endDate = end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
 		// Build the DataView query for course pages
-		let dvQuery = 'TABLE file.path, file.name, file.course_id';
-		if (courseId) {
-			dvQuery += ` WHERE file.course_id = "${courseId}"`;
-		}
+		let dvQuery = `TABLE file.path, file.name, file.course_id WHERE ${query}`;
 		
+		
+		console.log('Dataview Query:', dvQuery);
 		const result = await dataviewApi.query(dvQuery);
+		console.log('Dataview Result:', result);
 		if (!result.successful) {
 			console.error('Dataview query failed:', result.error);
 			return [];
