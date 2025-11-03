@@ -140,12 +140,10 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
           });
         }
         const body = request.body;
-        const courseId = body.courseId;
         const start = body.start;
         const end = body.end;
         const query = body.query || '""';
         const entries = await this.processDueDates(app2, dataviewApi, {
-          courseId,
           start,
           end,
           query
@@ -295,17 +293,17 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
    * Implements course filtering, date range filtering, and markdown table parsing
    */
   async processDueDates(app, dataviewApi, params) {
-    const { courseId, start, end, query } = params;
+    const { start, end, query } = params;
     const entries = [];
     const startDate = start || new Date().toISOString().split("T")[0];
     const endDate = end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
     let pages;
-    if (courseId) {
-      pages = dataviewApi.pages(courseId);
+    if (query) {
+      pages = dataviewApi.pages(query);
     } else {
-      pages = dataviewApi.pages();
+      pages = dataviewApi.pages('""');
     }
-    const filteredPages = pages.filter((p) => p.file.name !== courseId && p.file.ext == "md");
+    const filteredPages = pages;
     console.log("Filtered pages count:", filteredPages.length);
     for (const page of filteredPages) {
       if (!page["file.path"])
@@ -338,7 +336,7 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
           if (query && !assignment.toLowerCase().includes(query.toLowerCase())) {
             continue;
           }
-          const formattedAssignment = assignment.match(/[A-Z]{3}-[0-9]{3}/) ? assignment : `#${page["file.course_id"] || courseId || "unknown"} - ${assignment}`;
+          const formattedAssignment = assignment.match(/[A-Z]{3}-[0-9]{3}/) ? assignment : `#${page["file.course_id"] || "unknown"} - ${assignment}`;
           const now = new Date();
           const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1e3);
           const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1e3);

@@ -1,5 +1,5 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
-
+import Moment from 'moment';
 // Plugin settings interface
 interface TodosApiSettings {
 	defaultSection: string;
@@ -182,14 +182,12 @@ export default class TodosApiPlugin extends Plugin {
 
 				// Parse request body with DataView integration parameters
 				const body = request.body;
-				const courseId = body.courseId;
 				const start = body.start;
 				const end = body.end;
 				const query = body.query || '""';
 
 				// Implement processDueDates.js logic
 				const entries = await this.processDueDates(app, dataviewApi, {
-					courseId,
 					start,
 					end,
 					query
@@ -213,12 +211,12 @@ export default class TodosApiPlugin extends Plugin {
 		this.api.addRoute('/todos/').post(async (request: any, response: any) => {
 			try {
 				const app = this.app as ObsidianApp;
-
+        const moment = new Moment
 				// Parse request body
 				const body = request.body;
 				const text = body.text;
 				const status = body.status || ' ';
-				const filePath = body.path || this.getCurrentDailyNotePath();
+				const filePath = moment().format(body.path || this.getCurrentDailyNotePath());
 
 				if (!text) {
 					return response.status(400).json({
@@ -394,29 +392,25 @@ export default class TodosApiPlugin extends Plugin {
 	 * Implements course filtering, date range filtering, and markdown table parsing
 	 */
 	private async processDueDates(app: ObsidianApp, dataviewApi: any, params: {
-		courseId?: string;
 		start?: string;
 		end?: string;
 		query?: string;
 	}): Promise<any[]> {
-		const { courseId, start, end, query } = params;
+		const {start, end, query } = params;
 		const entries: any[] = [];
 
 		// Determine the start and end dates using your processDueDates.js logic
 		const startDate = start || new Date().toISOString().split('T')[0];
 		const endDate = end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-		// Use dv.pages() like the original processDueDates.js
-		// Original code: const pages = dv.pages(`${courseId}`).filter((p) => p.file.name !== courseId && p.file.ext == "md")
 		let pages;
-		if (courseId) {
-			pages = dataviewApi.pages(courseId);
+		if (query) {
+			pages = dataviewApi.pages(query);
 		} else {
-			pages = dataviewApi.pages();
+			pages = dataviewApi.pages('""');
 		}
 		
-		// Filter like original code: exclude the courseId file itself and non-markdown files
-		const filteredPages = pages.filter((p:any) => p.file.name !== courseId && p.file.ext == "md");
+		const filteredPages = pages;
 		console.log('Filtered pages count:', filteredPages.length);
 
 		// Process each page that matches the course filter
@@ -471,7 +465,7 @@ export default class TodosApiPlugin extends Plugin {
 					// Format assignment with course prefix (from your logic)
 					const formattedAssignment = assignment.match(/[A-Z]{3}-[0-9]{3}/)
 						? assignment
-						: `#${page['file.course_id'] || courseId || 'unknown'} - ${assignment}`;
+						: `#${page['file.course_id'] ||'unknown'} - ${assignment}`;
 
 					// Format due date based on your logic
 					const now = new Date();
