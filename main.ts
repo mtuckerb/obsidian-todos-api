@@ -219,7 +219,7 @@ export default class TodosApiPlugin extends Plugin {
 				const body = request.body;
 				const text = body.text;
 				const status = body.status || ' ';
-				const filePath = body.path || this.getCurrentDailyNotePath();
+				const filePath = moment().format(body.path || this.getCurrentDailyNotePath());
 
 				if (!text) {
 					return response.status(400).json({
