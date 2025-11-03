@@ -406,20 +406,21 @@ export default class TodosApiPlugin extends Plugin {
 		const startDate = start || new Date().toISOString().split('T')[0];
 		const endDate = end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-		// Build the DataView query for course pages
-		let dvQuery = `TABLE file.path, file.name, file.course_id WHERE ${query}`;
-		
-		
-		console.log('Dataview Query:', dvQuery);
-		const result = await dataviewApi.query(dvQuery);
-		console.log('Dataview Result:', result);
-		if (!result.successful) {
-			console.error('Dataview query failed:', result.error);
-			return [];
+		// Use dv.pages() like the original processDueDates.js
+		// Original code: const pages = dv.pages(`${courseId}`).filter((p) => p.file.name !== courseId && p.file.ext == "md")
+		let pages;
+		if (courseId) {
+			pages = dataviewApi.pages(courseId);
+		} else {
+			pages = dataviewApi.pages();
 		}
+		
+		// Filter like original code: exclude the courseId file itself and non-markdown files
+		const filteredPages = pages.filter((p) => p.file.name !== courseId && p.file.ext == "md");
+		console.log('Filtered pages count:', filteredPages.length);
 
 		// Process each page that matches the course filter
-		for (const page of result.value.values) {
+		for (const page of filteredPages) {
 			if (!page['file.path']) continue;
 
 			try {
