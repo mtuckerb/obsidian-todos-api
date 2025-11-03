@@ -299,15 +299,15 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
     const entries = [];
     const startDate = start || new Date().toISOString().split("T")[0];
     const endDate = end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1e3).toISOString().split("T")[0];
-    let dvQuery = `TABLE file.path, file.name, file.course_id WHERE ${query}`;
-    console.log("Dataview Query:", dvQuery);
-    const result = await dataviewApi.query(dvQuery);
-    console.log("Dataview Result:", result);
-    if (!result.successful) {
-      console.error("Dataview query failed:", result.error);
-      return [];
+    let pages;
+    if (courseId) {
+      pages = dataviewApi.pages(courseId);
+    } else {
+      pages = dataviewApi.pages();
     }
-    for (const page of result.value.values) {
+    const filteredPages = pages.filter((p) => p.file.name !== courseId && p.file.ext == "md");
+    console.log("Filtered pages count:", filteredPages.length);
+    for (const page of filteredPages) {
       if (!page["file.path"])
         continue;
       try {

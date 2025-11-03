@@ -416,7 +416,7 @@ export default class TodosApiPlugin extends Plugin {
 		}
 		
 		// Filter like original code: exclude the courseId file itself and non-markdown files
-		const filteredPages = pages.filter((p) => p.file.name !== courseId && p.file.ext == "md");
+		const filteredPages = pages.filter((p:any) => p.file.name !== courseId && p.file.ext == "md");
 		console.log('Filtered pages count:', filteredPages.length);
 
 		// Process each page that matches the course filter
