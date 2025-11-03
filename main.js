@@ -4161,7 +4161,7 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
         const body = request.body;
         const text = body.text;
         const status = body.status || " ";
-        const filePath = moment().format(this.getCurrentDailyNotePath());
+        const filePath = moment().format(body.path || this.getCurrentDailyNotePath());
         if (!text) {
           return response.status(400).json({
             error: "Missing required field",
@@ -4358,7 +4358,7 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
    */
   getCurrentDailyNotePath() {
     const today = moment().format("YYYY-MM-DD");
-    return `${this.settings.dailyNotesPath}/${today}.md`;
+    return moment().format(this.settings.dailyNotesPath);
   }
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());

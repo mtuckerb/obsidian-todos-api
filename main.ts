@@ -219,7 +219,7 @@ export default class TodosApiPlugin extends Plugin {
 				const body = request.body;
 				const text = body.text;
 				const status = body.status || ' ';
-				const filePath = moment().format(this.getCurrentDailyNotePath());
+				const filePath = moment().format(body.path || this.getCurrentDailyNotePath());
 
 				if (!text) {
 					return response.status(400).json({
@@ -508,7 +508,7 @@ export default class TodosApiPlugin extends Plugin {
 	 */
 	private getCurrentDailyNotePath(): string {
 		const today = moment().format('YYYY-MM-DD');
-		return `${this.settings.dailyNotesPath}/${today}.md`;
+		return moment().format(this.settings.dailyNotesPath);
 	}
 
 	async loadSettings() {
