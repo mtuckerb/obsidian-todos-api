@@ -1,10 +1,10 @@
 {
 	"id": "obsidian-todos-api",
 	"name": "Todos REST API",
-	"minAppVersion": "0.15.0",
+	"minAppVersio": "0.15.0",
 	"description": "Extends Local REST API to serve todos from Dataview with add/update capabilities",
 	"author": "mtuckerb",
 	"authorUrl": "https://github.com/mtuckerb",
 	"isDesktopOnly": false,
-	"version": "1.1.10"
+	"version": "1.1.16"
 }

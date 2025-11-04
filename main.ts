@@ -1,5 +1,6 @@
 import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
-import Moment from 'moment';
+const moment = require('moment');
+
 // Plugin settings interface
 interface TodosApiSettings {
 	defaultSection: string;
@@ -109,7 +110,7 @@ export default class TodosApiPlugin extends Plugin {
 				const filterTag = params.get('tag');
 				const filterStatus = params.get('status');
 				const excludeDirs = params.get('exclude')?.split(',').map(d => d.trim()) || 
-								   this.settings.excludedDirectories.split(',').map(d => d.trim());
+							   this.settings.excludedDirectories.split(',').map(d => d.trim());
 
 				// Apply filters
 				let filteredTasks = tasks;
@@ -182,12 +183,14 @@ export default class TodosApiPlugin extends Plugin {
 
 				// Parse request body with DataView integration parameters
 				const body = request.body;
+				const courseId = body.courseId;
 				const start = body.start;
 				const end = body.end;
 				const query = body.query || '""';
 
 				// Implement processDueDates.js logic
 				const entries = await this.processDueDates(app, dataviewApi, {
+					courseId,
 					start,
 					end,
 					query
@@ -211,7 +214,7 @@ export default class TodosApiPlugin extends Plugin {
 		this.api.addRoute('/todos/').post(async (request: any, response: any) => {
 			try {
 				const app = this.app as ObsidianApp;
-        const moment = new Moment
+
 				// Parse request body
 				const body = request.body;
 				const text = body.text;
@@ -392,25 +395,29 @@ export default class TodosApiPlugin extends Plugin {
 	 * Implements course filtering, date range filtering, and markdown table parsing
 	 */
 	private async processDueDates(app: ObsidianApp, dataviewApi: any, params: {
+		courseId?: string;
 		start?: string;
 		end?: string;
 		query?: string;
 	}): Promise<any[]> {
-		const {start, end, query } = params;
+		const { courseId, start, end, query } = params;
 		const entries: any[] = [];
 
 		// Determine the start and end dates using your processDueDates.js logic
-		const startDate = start || new Date().toISOString().split('T')[0];
-		const endDate = end || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+		const startDate = start || moment().subtract(1, 'day').format('YYYY-MM-DD');
+		const endDate = end || moment().format('YYYY-MM-DD');
 
+		// Use dv.pages() like the original processDueDates.js
+		// Original code: const pages = dv.pages(`${courseId}`).filter((p) => p.file.name !== courseId && p.file.ext == "md")
 		let pages;
-		if (query) {
-			pages = dataviewApi.pages(query);
+		if (courseId) {
+			pages = dataviewApi.pages(courseId);
 		} else {
-			pages = dataviewApi.pages('""');
+			pages = dataviewApi.pages();
 		}
 		
-		const filteredPages = pages;
+		// Filter like original code: exclude the courseId file itself and non-markdown files
+		const filteredPages = pages.filter((p:any) => p.file.name !== courseId && p.file.ext == "md");
 		console.log('Filtered pages count:', filteredPages.length);
 
 		// Process each page that matches the course filter
@@ -448,12 +455,12 @@ export default class TodosApiPlugin extends Plugin {
 						continue;
 					}
 
-					// Apply date filtering
-					const dueDateObj = new Date(dueDate);
-					const startObj = new Date(startDate);
-					const endObj = new Date(endDate);
+					// Apply date filtering using moment.js
+					const dueDateObj = moment(dueDate);
+					const startObj = moment(startDate);
+					const endObj = moment(endDate);
 
-					if (dueDateObj < startObj || dueDateObj > endObj) {
+					if (!dueDateObj.isBetween(startObj, endObj)) {
 						continue;
 					}
 
@@ -465,17 +472,13 @@ export default class TodosApiPlugin extends Plugin {
 					// Format assignment with course prefix (from your logic)
 					const formattedAssignment = assignment.match(/[A-Z]{3}-[0-9]{3}/)
 						? assignment
-						: `#${page['file.course_id'] ||'unknown'} - ${assignment}`;
+						: `#${page['file.course_id'] || courseId || 'unknown'} - ${assignment}`;
 
-					// Format due date based on your logic
-					const now = new Date();
-					const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-					const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
-
+					// Format due date based on your logic using moment.js
 					let formattedDueDate = dueDate;
-					if (dueDateObj > oneWeekAgo) {
+					if (dueDateObj.isAfter(moment().subtract(1, 'week'))) {
 						formattedDueDate = `<span class="due one_week">${dueDate}</span>`;
-					} else if (dueDateObj > twoWeeksAgo) {
+					} else if (dueDateObj.isAfter(moment().subtract(2, 'week'))) {
 						formattedDueDate = `<span class="due two_weeks">${dueDate}</span>`;
 					}
 
@@ -494,7 +497,7 @@ export default class TodosApiPlugin extends Plugin {
 		}
 
 		// Sort by due date
-		entries.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+		entries.sort((a, b) => moment(a.dueDate).valueOf() - moment(b.dueDate).valueOf());
 
 		return entries;
 	}
@@ -504,8 +507,8 @@ export default class TodosApiPlugin extends Plugin {
 	 * @returns The path to the current daily note
 	 */
 	private getCurrentDailyNotePath(): string {
-		const today = new Date().toISOString().split('T')[0];
-		return `${this.settings.dailyNotesPath}/${today}.md`;
+		const today = moment().format('YYYY-MM-DD');
+		return moment().format(this.settings.dailyNotesPath);
 	}
 
 	async loadSettings() {
