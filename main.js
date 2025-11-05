@@ -4083,7 +4083,13 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
         let filteredTasks = tasks;
         if (filterCompleted !== null) {
           const showCompleted = filterCompleted === "true";
-          filteredTasks = filteredTasks.filter((task) => task.completed === showCompleted);
+          if (showCompleted) {
+            filteredTasks = filteredTasks.filter((task) => task.completed === true);
+          } else {
+            filteredTasks = filteredTasks.filter(
+              (task) => task.completed === false && task.status !== "x"
+            );
+          }
         }
         if (filterPath) {
           filteredTasks = filteredTasks.filter(
@@ -4103,9 +4109,12 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
             (task) => !excludeDirs.some((dir) => task.path.startsWith(dir))
           );
         }
+        const tasksWithParentIds = this.processChildTasks(filteredTasks);
+        const deduplicatedTasks = this.deduplicateTasks(tasksWithParentIds);
+        const cleanTasks = this.filterTaskFields(deduplicatedTasks);
         return response.status(200).json({
-          count: filteredTasks.length,
-          tasks: filteredTasks
+          count: cleanTasks.length,
+          tasks: cleanTasks
         });
       } catch (error) {
         console.error("Error fetching todos:", error);
@@ -4282,6 +4291,65 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
       }
     }
     return tasks;
+  }
+  /**
+   * Process child tasks and add parent_id references
+   * When todos have children, they are flattened into separate todo objects
+   * Each child gets a parent_id reference to maintain hierarchical relationships
+   */
+  processChildTasks(tasks) {
+    const processedTasks = [];
+    for (const task of tasks) {
+      processedTasks.push({
+        ...task,
+        parent_id: null
+        // Top-level tasks have no parent
+      });
+      if (task.children && task.children.length > 0) {
+        for (const child of task.children) {
+          processedTasks.push({
+            ...child,
+            parent_id: `${task.path}-${task.line}`
+            // Create unique parent reference
+          });
+        }
+      }
+    }
+    return processedTasks;
+  }
+  /**
+   * Apply deduplication system using unique key based on {path}-{line}-{text}
+   * Prevents duplicate todos from appearing in the response
+   * Works for both parent and child tasks
+   */
+  deduplicateTasks(tasks) {
+    const seen = /* @__PURE__ */ new Set();
+    const deduplicatedTasks = [];
+    for (const task of tasks) {
+      const key = `${task.path}-${task.line}-${task.text}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduplicatedTasks.push(task);
+      }
+    }
+    return deduplicatedTasks;
+  }
+  /**
+   * Apply field filtering - return only essential fields
+   * Returns: text, path, line, position, status, completed, fullyCompleted, scheduled, due, start
+   * Eliminates unnecessary verbose data from the API response
+   */
+  filterTaskFields(tasks) {
+    const essentialFields = ["text", "path", "line", "position", "status", "completed", "fullyCompleted", "scheduled", "due", "start", "parent_id"];
+    return tasks.map((task) => {
+      const filteredTask = {};
+      for (const field of essentialFields) {
+        if (task[field] !== void 0) {
+          filteredTask[field] = task[field];
+        }
+      }
+      return filteredTask;
+    });
   }
   /**
    * Process due dates using the logic from processDueDates.js
