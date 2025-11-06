@@ -176,6 +176,56 @@ export default class TodosApiPlugin extends Plugin {
 
 		// Register POST /todos route for adding todos
 
+		// Register GET /due-dates route for DataView-based due dates processing (MCP integration)
+		this.api.addRoute('/due-dates/').get(async (request: any, response: any) => {
+			try {
+				const app = this.app as ObsidianApp;
+				
+				// Check if Dataview plugin is available
+				const dataviewPlugin = app.plugins.plugins.dataview;
+				if (!dataviewPlugin) {
+					return response.status(503).json({
+						error: 'Dataview plugin not found',
+						message: 'Please install and enable the Dataview plugin'
+					});
+				}
+
+				const dataviewApi = dataviewPlugin.api;
+				if (!dataviewApi) {
+					return response.status(503).json({
+						error: 'Dataview API not available',
+						message: 'Dataview plugin may not be fully loaded'
+					});
+				}
+
+				// Parse query parameters for filtering (from MCP server)
+				const params = new URLSearchParams(request.url.split('?')[1] || '');
+				const start = params.get('start');
+				const end = params.get('end');
+				const query = params.get('query') || '';
+
+				// Implement processDueDates.js logic using query params
+				const entries = await this.processDueDates(app, dataviewApi, {
+					start,
+					end,
+					query
+				});
+
+				// Return the processed entries
+				return response.status(200).json({
+					count: entries.length,
+					entries: entries
+				});
+
+			} catch (error) {
+				console.error('Error processing due dates:', error);
+				return response.status(500).json({
+					error: 'Internal server error',
+					message: error.message
+				});
+			}
+		});
+
 		// Register POST /due-dates route for DataView-based due dates processing
 		this.api.addRoute('/due-dates').post(async (request: any, response: any) => {
 			try {
