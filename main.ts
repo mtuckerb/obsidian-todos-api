@@ -551,20 +551,41 @@ export default class TodosApiPlugin extends Plugin {
 		const endDate = end || moment().format('YYYY-MM-DD');
 
 		// Use dv.pages() like the original processDueDates.js
-		// Original code: const pages = dv.pages(`${courseId}`).filter((p) => p.file.name !== courseId && p.file.ext == "md")
+		// Handle both courseId-based queries and tag-based queries
 		let pages;
-		if (courseId) {
-			pages = dataviewApi.pages(courseId);
+		if (query && query.startsWith('#')) {
+			// Handle tag-based queries like #education
+			pages = dataviewApi.pages(`"${query}"`);
+		} else if (courseId) {
+			// Handle courseId-based queries
+			pages = dataviewApi.pages(`"${courseId}"`);
 		} else {
+			// Get all pages
 			pages = dataviewApi.pages();
 		}
 		
 		// Filter like original code: exclude the courseId file itself and non-markdown files
-		const filteredPages = pages.filter((p:any) => p.file.name !== courseId && p.file.ext == "md");
-		console.log('Filtered pages count:', filteredPages.length);
+		const filteredPages = pages.filter((p:any) => 
+			(!courseId || p.file.name !== courseId) && 
+			p.file.ext == "md"
+		);
+		
+		// Apply query filtering if provided
+		let finalPages = filteredPages;
+		if (query) {
+			const searchTerm = query.toLowerCase();
+			finalPages = filteredPages.filter((p:any) => {
+				const fileName = p.file.name.toLowerCase();
+				const filePath = p.file.path.toLowerCase();
+				return fileName.includes(searchTerm) || filePath.includes(searchTerm);
+			});
+		}
+		
+		console.log('Filtered pages count:', finalPages.length);
+		console.log('Query used:', query || courseId);
 
 		// Process each page that matches the course filter
-		for (const page of filteredPages) {
+		for (const page of finalPages) {
 			if (!page['file.path']) continue;
 
 			try {
