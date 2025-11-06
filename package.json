@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-todos-api",
-	"version": "1.2.38",
+	"version": "1.2.39",
 	"description": "Obsidian plugin to expose todos via REST API",
 	"main": "main.js",
 	"scripts": {
