@@ -200,8 +200,8 @@ export default class TodosApiPlugin extends Plugin {
 
 				// Parse query parameters for filtering (from MCP server)
 				const params = new URLSearchParams(request.url.split('?')[1] || '');
-				const start = params.get('start');
-				const end = params.get('end');
+				const start = params.get('start') || undefined;
+				const end = params.get('end') || undefined;
 				const query = params.get('query') || '';
 
 				// Implement processDueDates.js logic using query params

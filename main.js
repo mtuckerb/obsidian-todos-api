@@ -4124,6 +4124,44 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
         });
       }
     });
+    this.api.addRoute("/due-dates/").get(async (request, response) => {
+      try {
+        const app2 = this.app;
+        const dataviewPlugin = app2.plugins.plugins.dataview;
+        if (!dataviewPlugin) {
+          return response.status(503).json({
+            error: "Dataview plugin not found",
+            message: "Please install and enable the Dataview plugin"
+          });
+        }
+        const dataviewApi = dataviewPlugin.api;
+        if (!dataviewApi) {
+          return response.status(503).json({
+            error: "Dataview API not available",
+            message: "Dataview plugin may not be fully loaded"
+          });
+        }
+        const params = new URLSearchParams(request.url.split("?")[1] || "");
+        const start = params.get("start") || void 0;
+        const end = params.get("end") || void 0;
+        const query = params.get("query") || "";
+        const entries = await this.processDueDates(app2, dataviewApi, {
+          start,
+          end,
+          query
+        });
+        return response.status(200).json({
+          count: entries.length,
+          entries
+        });
+      } catch (error) {
+        console.error("Error processing due dates:", error);
+        return response.status(500).json({
+          error: "Internal server error",
+          message: error.message
+        });
+      }
+    });
     this.api.addRoute("/due-dates").post(async (request, response) => {
       try {
         const app2 = this.app;
