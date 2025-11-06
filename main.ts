@@ -203,6 +203,10 @@ export default class TodosApiPlugin extends Plugin {
 				const start = params.get('start') || undefined;
 				const end = params.get('end') || undefined;
 				const query = params.get('query') || '';
+				const page = parseInt(params.get('page') || '1');
+				const limit = parseInt(params.get('limit') || '50');
+				const sortBy = params.get('sortBy') || 'dueDate';
+				const sortOrder = params.get('sortOrder') || 'asc';
 
 				// Implement processDueDates.js logic using query params
 				const entries = await this.processDueDates(app, dataviewApi, {
