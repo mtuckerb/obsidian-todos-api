@@ -5,6 +5,5 @@
 	"description": "Extends Local REST API to serve todos from Dataview with add/update capabilities",
 	"author": "mtuckerb",
 	"authorUrl": "https://github.com/mtuckerb",
-	"isDesktopOnly": false,
-	"version": "1.3.3"
+	"isDesktopOnly": false
 }
