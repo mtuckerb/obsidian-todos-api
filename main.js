@@ -4145,6 +4145,10 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
         const start = params.get("start") || void 0;
         const end = params.get("end") || void 0;
         const query = params.get("query") || "";
+        const page = parseInt(params.get("page") || "1");
+        const limit = parseInt(params.get("limit") || "50");
+        const sortBy = params.get("sortBy") || "dueDate";
+        const sortOrder = params.get("sortOrder") || "asc";
         const entries = await this.processDueDates(app2, dataviewApi, {
           start,
           end,
@@ -4399,14 +4403,28 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
     const startDate = start || moment().subtract(1, "day").format("YYYY-MM-DD");
     const endDate = end || moment().format("YYYY-MM-DD");
     let pages;
-    if (courseId) {
-      pages = dataviewApi.pages(courseId);
+    if (query && query.startsWith("#")) {
+      pages = dataviewApi.pages(`"${query}"`);
+    } else if (courseId) {
+      pages = dataviewApi.pages(`"${courseId}"`);
     } else {
       pages = dataviewApi.pages();
     }
-    const filteredPages = pages.filter((p) => p.file.name !== courseId && p.file.ext == "md");
-    console.log("Filtered pages count:", filteredPages.length);
-    for (const page of filteredPages) {
+    const filteredPages = pages.filter(
+      (p) => (!courseId || p.file.name !== courseId) && p.file.ext == "md"
+    );
+    let finalPages = filteredPages;
+    if (query) {
+      const searchTerm = query.toLowerCase();
+      finalPages = filteredPages.filter((p) => {
+        const fileName = p.file.name.toLowerCase();
+        const filePath = p.file.path.toLowerCase();
+        return fileName.includes(searchTerm) || filePath.includes(searchTerm);
+      });
+    }
+    console.log("Filtered pages count:", finalPages.length);
+    console.log("Query used:", query || courseId);
+    for (const page of finalPages) {
       if (!page["file.path"])
         continue;
       try {
@@ -4444,6 +4462,7 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
           } else if (dueDateObj.isAfter(moment().subtract(2, "week"))) {
             formattedDueDate = `<span class="due two_weeks">${dueDate}</span>`;
           }
+          console.log(`Pushing to entries: ${dueDate}, ${assignment}`);
           entries.push({
             dueDate,
             formattedDueDate,
