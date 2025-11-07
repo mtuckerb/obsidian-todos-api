@@ -645,7 +645,7 @@ export default class TodosApiPlugin extends Plugin {
 					} else if (dueDateObj.isAfter(moment().subtract(2, 'week'))) {
 						formattedDueDate = `<span class="due two_weeks">${dueDate}</span>`;
 					}
-					console.log(`Pushing to entries: ${dueDate}, ${assignment}`)
+					console.log(`Pushing to entries: ${dueDate}, ${assignment}`);
 					// Add the entry
 					entries.push({
 						dueDate,
