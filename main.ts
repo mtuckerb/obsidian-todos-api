@@ -266,7 +266,7 @@ export default class TodosApiPlugin extends Plugin {
 					end,
 					query
 				});
-
+				const bogus = ["2025-11-16", "A task that must be done"]
 				// Return the processed entries
 				return response.status(200).json({
 					count: entries.length,
