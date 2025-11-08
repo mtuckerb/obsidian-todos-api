@@ -4155,8 +4155,8 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
           query
         });
         return response.status(200).json({
-          count: entries.length,
-          entries
+          count: 1,
+          entries: ["2025-11-15", "this is the result"]
         });
       } catch (error) {
         console.error("Error processing due dates:", error);

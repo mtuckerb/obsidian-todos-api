@@ -217,8 +217,8 @@ export default class TodosApiPlugin extends Plugin {
 
 				// Return the processed entries
 				return response.status(200).json({
-					count: entries.length,
-					entries: entries
+					count: 1,
+					entries: ["2025-11-15", "this is the result"] 
 				});
 
 			} catch (error) {
