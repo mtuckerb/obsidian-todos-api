@@ -217,8 +217,8 @@ export default class TodosApiPlugin extends Plugin {
 
 				// Return the processed entries
 				return response.status(200).json({
-					count: 1,
-					entries: ["2025-11-15", "this is the result"] 
+					count: entries.length,
+					entries: entries
 				});
 
 			} catch (error) {
@@ -546,9 +546,11 @@ export default class TodosApiPlugin extends Plugin {
 		const { courseId, start, end, query } = params;
 		const entries: any[] = [];
 
-		// Determine the start and end dates using your processDueDates.js logic
+		console.log('processDueDates called with:', { courseId, start, end, query });
+
+		// Apply the same logic as processDueDates.js - empty cutoff returns ALL uncompleted due dates
 		const startDate = start || moment().subtract(1, 'day').format('YYYY-MM-DD');
-		const endDate = end || moment().format('YYYY-MM-DD');
+		const endDate = end || moment().add(1, 'year').format('YYYY-MM-DD'); // Extended range to include future dates
 
 		// Use dv.pages() like the original processDueDates.js
 		// Handle both courseId-based queries and tag-based queries
@@ -586,7 +588,12 @@ export default class TodosApiPlugin extends Plugin {
 
 		// Process each page that matches the course filter
 		for (const page of finalPages) {
-			if (!page['file.path']) continue;
+			console.log(`Processing page: ${JSON.stringify(page, null, 2)}`);
+			
+			if (!page.file?.path) {
+				console.log(`Skipping page - no file.path: ${JSON.stringify(page)}`);
+				continue;
+			}
 
 			try {
 				// Read the file content to parse the markdown table
@@ -594,17 +601,26 @@ export default class TodosApiPlugin extends Plugin {
 				if (!(file instanceof TFile)) continue;
 
 				const content = await app.vault.read(file);
+				console.log(`File content length: ${content.length}`);
 				
 				// Parse the # Due Dates section using your regex pattern
 				const regex = /# Due Dates([\s\S]*?)(?=\n#|$)/;
 				const matches = content.match(regex);
 				
-				if (!matches) continue;
+				if (!matches) {
+					console.log(`No "Due Dates" section found in ${page.file.path}`);
+					console.log(`First 500 chars of content: ${content.substring(0, 500)}`);
+					continue;
+				}
 
+				console.log(`Found Due Dates section in ${page.file.path}`);
 				const tableData = matches[1].trim();
+				console.log(`Table data: "${tableData}"`);
+				
 				const lines = tableData.split('\n').slice(1); // Skip header row
+				console.log(`Found ${lines.length} data lines in table`);
 
-				for (const line of lines) {
+					console.log(`Processing line: "${line}"`);
 					const columns = line
 						.split('|')
 						.map(c => c.trim())
@@ -619,13 +635,27 @@ export default class TodosApiPlugin extends Plugin {
 						continue;
 					}
 
-					// Apply date filtering using moment.js
+					// Apply date filtering - ONLY if explicit date range was provided
+					// If no date range specified, include ALL future due dates
 					const dueDateObj = moment(dueDate);
 					const startObj = moment(startDate);
 					const endObj = moment(endDate);
 
-					if (!dueDateObj.isBetween(startObj, endObj)) {
-						continue;
+					// Only apply date filtering if user explicitly provided date parameters
+					// OR if we're using default behavior (include all uncompleted due dates)
+					if (start || end) {
+						// User provided explicit date range - apply filtering
+						if (!dueDateObj.isBetween(startObj, endObj, 'day', '[]')) {
+							console.log(`Date ${dueDate} not in range ${startDate} to ${endDate}`);
+							continue;
+						}
+					} else {
+						// No explicit date range - only filter out past dates that are too old
+						// Allow all future due dates and recent past due dates
+						if (dueDateObj.isBefore(moment().subtract(30, 'days'))) {
+							console.log(`Date ${dueDate} is too far in the past`);
+							continue;
+						}
 					}
 
 					// Apply query filtering
@@ -660,6 +690,7 @@ export default class TodosApiPlugin extends Plugin {
 			}
 		}
 
+		console.log(`Total entries found: ${entries.length}`);
 		// Sort by due date
 		entries.sort((a, b) => moment(a.dueDate).valueOf() - moment(b.dueDate).valueOf());
 
