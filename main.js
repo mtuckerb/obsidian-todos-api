@@ -4402,7 +4402,7 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
     var _a;
     const { courseId, start, end, query } = params;
     const entries = [];
-    console.log("processDueDates called with:", { courseId, start, end, query });
+    console.log("\u{1F50D} DEBUG: processDueDates called with:", { courseId, start, end, query });
     const startDate = start || moment().subtract(1, "day").format("YYYY-MM-DD");
     const endDate = end || moment().add(1, "year").format("YYYY-MM-DD");
     let pages;

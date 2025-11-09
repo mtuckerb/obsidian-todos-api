@@ -547,7 +547,7 @@ export default class TodosApiPlugin extends Plugin {
 		const { courseId, start, end, query } = params;
 		const entries: any[] = [];
 
-		console.log('processDueDates called with:', { courseId, start, end, query });
+		console.log('🔍 DEBUG: processDueDates called with:', { courseId, start, end, query });
 
 		// Apply the same logic as processDueDates.js - empty cutoff returns ALL uncompleted due dates
 		const startDate = start || moment().subtract(1, 'day').format('YYYY-MM-DD');
