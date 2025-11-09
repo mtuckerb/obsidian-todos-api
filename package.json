@@ -27,7 +27,7 @@
 		"esbuild": "0.17.3",
 		"obsidian": "latest",
 		"obsidian-local-rest-api": "latest",
-		"tslib": "2.4.0",
+		"tslib": "^2.4.0",
 		"typescript": "^5.9.3"
 	},
 	"dependencies": {

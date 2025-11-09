@@ -4155,8 +4155,8 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
           query
         });
         return response.status(200).json({
-          count: 1,
-          entries: ["2025-11-15", "this is the result"]
+          count: entries.length,
+          entries
         });
       } catch (error) {
         console.error("Error processing due dates:", error);
@@ -4194,6 +4194,7 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
           end,
           query
         });
+        const bogus = ["2025-11-16", "A task that must be done"];
         return response.status(200).json({
           count: entries.length,
           entries
@@ -4398,10 +4399,12 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
    * Implements course filtering, date range filtering, and markdown table parsing
    */
   async processDueDates(app, dataviewApi, params) {
+    var _a;
     const { courseId, start, end, query } = params;
     const entries = [];
+    console.log("processDueDates called with:", { courseId, start, end, query });
     const startDate = start || moment().subtract(1, "day").format("YYYY-MM-DD");
-    const endDate = end || moment().format("YYYY-MM-DD");
+    const endDate = end || moment().add(1, "year").format("YYYY-MM-DD");
     let pages;
     if (query && query.startsWith("#")) {
       pages = dataviewApi.pages(`"${query}"`);
@@ -4425,20 +4428,31 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
     console.log("Filtered pages count:", finalPages.length);
     console.log("Query used:", query || courseId);
     for (const page of finalPages) {
-      if (!page["file.path"])
+      console.log(`Processing page: ${JSON.stringify(page, null, 2)}`);
+      if (!((_a = page.file) == null ? void 0 : _a.path)) {
+        console.log(`Skipping page - no file.path: ${JSON.stringify(page)}`);
         continue;
+      }
       try {
         const file = app.vault.getAbstractFileByPath(page["file.path"]);
         if (!(file instanceof import_obsidian.TFile))
           continue;
         const content = await app.vault.read(file);
+        console.log(`File content length: ${content.length}`);
         const regex = /# Due Dates([\s\S]*?)(?=\n#|$)/;
         const matches = content.match(regex);
-        if (!matches)
+        if (!matches) {
+          console.log(`No "Due Dates" section found in ${page.file.path}`);
+          console.log(`First 500 chars of content: ${content.substring(0, 500)}`);
           continue;
+        }
+        console.log(`Found Due Dates section in ${page.file.path}`);
         const tableData = matches[1].trim();
+        console.log(`Table data: "${tableData}"`);
         const lines = tableData.split("\n").slice(1);
+        console.log(`Found ${lines.length} data lines in table`);
         for (const line of lines) {
+          console.log(`Processing line: "${line}"`);
           const columns = line.split("|").map((c) => c.trim()).filter((c) => c);
           if (columns.length < 2)
             continue;
@@ -4449,8 +4463,16 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
           const dueDateObj = moment(dueDate);
           const startObj = moment(startDate);
           const endObj = moment(endDate);
-          if (!dueDateObj.isBetween(startObj, endObj)) {
-            continue;
+          if (start || end) {
+            if (!dueDateObj.isBetween(startObj, endObj, "day", "[]")) {
+              console.log(`Date ${dueDate} not in range ${startDate} to ${endDate}`);
+              continue;
+            }
+          } else {
+            if (dueDateObj.isBefore(moment().subtract(30, "days"))) {
+              console.log(`Date ${dueDate} is too far in the past`);
+              continue;
+            }
           }
           if (query && !assignment.toLowerCase().includes(query.toLowerCase())) {
             continue;
@@ -4474,6 +4496,7 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
         console.error(`Error processing file ${page["file.path"]}:`, error);
       }
     }
+    console.log(`Total entries found: ${entries.length}`);
     entries.sort((a, b) => moment(a.dueDate).valueOf() - moment(b.dueDate).valueOf());
     return entries;
   }

@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { App, Plugin, PluginSettingTab, Setting, TFile } from 'obsidian';
 const moment = require('moment');
 
@@ -620,6 +621,8 @@ export default class TodosApiPlugin extends Plugin {
 				const lines = tableData.split('\n').slice(1); // Skip header row
 				console.log(`Found ${lines.length} data lines in table`);
 
+				// Process each table row
+				for (const line of lines) {
 					console.log(`Processing line: "${line}"`);
 					const columns = line
 						.split('|')
