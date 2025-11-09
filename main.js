@@ -4397,106 +4397,112 @@ var TodosApiPlugin = class extends import_obsidian.Plugin {
   /**
    * Process due dates using the logic from processDueDates.js
    * Implements course filtering, date range filtering, and markdown table parsing
+   * Uses app.metadataCache.fileCache for efficient file discovery
    */
   async processDueDates(app, dataviewApi, params) {
-    var _a;
     const { courseId, start, end, query } = params;
     const entries = [];
     console.log("\u{1F50D} DEBUG: processDueDates called with:", { courseId, start, end, query });
     const startDate = start || moment().subtract(1, "day").format("YYYY-MM-DD");
     const endDate = end || moment().add(1, "year").format("YYYY-MM-DD");
-    let pages;
-    if (query && query.startsWith("#")) {
-      pages = dataviewApi.pages(`"${query}"`);
-    } else if (courseId) {
-      pages = dataviewApi.pages(`"${courseId}"`);
-    } else {
-      pages = dataviewApi.pages();
-    }
-    const filteredPages = pages.filter(
-      (p) => (!courseId || p.file.name !== courseId) && p.file.ext == "md"
-    );
-    let finalPages = filteredPages;
-    if (query) {
-      const searchTerm = query.toLowerCase();
-      finalPages = filteredPages.filter((p) => {
-        const fileName = p.file.name.toLowerCase();
-        const filePath = p.file.path.toLowerCase();
-        return fileName.includes(searchTerm) || filePath.includes(searchTerm);
-      });
-    }
-    console.log("Filtered pages count:", finalPages.length);
-    console.log("Query used:", query || courseId);
-    for (const page of finalPages) {
-      console.log(`Processing page: ${JSON.stringify(page, null, 2)}`);
-      if (!((_a = page.file) == null ? void 0 : _a.path)) {
-        console.log(`Skipping page - no file.path: ${JSON.stringify(page)}`);
-        continue;
+    const fileCache = app.metadataCache.fileCache;
+    const allFiles = Object.keys(fileCache);
+    console.log(`\u{1F50D} DEBUG: Found ${allFiles.length} files in metadata cache`);
+    let candidateFiles = allFiles.filter((filePath) => {
+      var _a;
+      if (!filePath.endsWith(".md"))
+        return false;
+      if (courseId && !filePath.includes(courseId))
+        return false;
+      if (query) {
+        const searchTerm = query.toLowerCase();
+        const fileName = ((_a = filePath.split("/").pop()) == null ? void 0 : _a.toLowerCase()) || "";
+        return fileName.includes(searchTerm) || filePath.toLowerCase().includes(searchTerm);
       }
+      return true;
+    });
+    console.log(`\u{1F50D} DEBUG: After filtering: ${candidateFiles.length} candidate files`);
+    for (const filePath of candidateFiles) {
+      console.log(`\u{1F50D} DEBUG: Processing file: ${filePath}`);
       try {
-        const file = app.vault.getAbstractFileByPath(page["file.path"]);
-        if (!(file instanceof import_obsidian.TFile))
-          continue;
-        const content = await app.vault.read(file);
-        console.log(`File content length: ${content.length}`);
-        const regex = /# Due Dates([\s\S]*?)(?=\n#|$)/;
-        const matches = content.match(regex);
-        if (!matches) {
-          console.log(`No "Due Dates" section found in ${page.file.path}`);
-          console.log(`First 500 chars of content: ${content.substring(0, 500)}`);
+        const file = app.vault.getAbstractFileByPath(filePath);
+        if (!file || !(file instanceof import_obsidian.TFile)) {
+          console.log(`\u{1F50D} DEBUG: SKIPPING - File not found or not TFile: ${filePath}`);
           continue;
         }
-        console.log(`Found Due Dates section in ${page.file.path}`);
+        const content = await app.vault.read(file);
+        console.log(`\u{1F50D} DEBUG: File content length: ${content.length}`);
+        const regex = /# Due Dates([\\s\\S]*?)(?=\\n#|$)/;
+        const matches = content.match(regex);
+        if (!matches) {
+          console.log(`\u{1F50D} DEBUG: No "Due Dates" section found in ${filePath}`);
+          continue;
+        }
+        console.log(`\u{1F50D} DEBUG: Found Due Dates section in ${filePath}`);
         const tableData = matches[1].trim();
-        console.log(`Table data: "${tableData}"`);
-        const lines = tableData.split("\n").slice(1);
-        console.log(`Found ${lines.length} data lines in table`);
+        console.log(`\u{1F50D} DEBUG: Table data preview: "${tableData.substring(0, 100)}"`);
+        const lines = tableData.split("\\n").slice(1);
+        console.log(`\u{1F50D} DEBUG: Found ${lines.length} data lines in table`);
         for (const line of lines) {
-          console.log(`Processing line: "${line}"`);
+          console.log(`\u{1F50D} DEBUG: Processing table line: "${line}"`);
           const columns = line.split("|").map((c) => c.trim()).filter((c) => c);
-          if (columns.length < 2)
+          console.log(`\u{1F50D} DEBUG: Parsed columns:`, columns);
+          if (columns.length < 2) {
+            console.log(`\u{1F50D} DEBUG: SKIPPED - Not enough columns (${columns.length})`);
             continue;
+          }
           let [dueDate, assignment] = columns;
-          if (!Date.parse(dueDate) || (assignment == null ? void 0 : assignment.includes("\u2705"))) {
+          console.log(`\u{1F50D} DEBUG: Due date: "${dueDate}"`);
+          console.log(`\u{1F50D} DEBUG: Assignment: "${assignment}"`);
+          if (!Date.parse(dueDate)) {
+            console.log(`\u{1F50D} DEBUG: SKIPPED - Invalid date: "${dueDate}"`);
+            continue;
+          }
+          if (assignment == null ? void 0 : assignment.includes("\u2705")) {
+            console.log(`\u{1F50D} DEBUG: SKIPPED - Completed assignment: "${assignment}"`);
             continue;
           }
           const dueDateObj = moment(dueDate);
           const startObj = moment(startDate);
           const endObj = moment(endDate);
+          console.log(`\u{1F50D} DEBUG: Date filtering - start: ${startDate}, end: ${endDate}`);
+          console.log(`\u{1F50D} DEBUG: Due date: ${dueDate}, start check: ${dueDateObj.isAfter(startObj)}, end check: ${dueDateObj.isBefore(endObj)}`);
           if (start || end) {
             if (!dueDateObj.isBetween(startObj, endObj, "day", "[]")) {
-              console.log(`Date ${dueDate} not in range ${startDate} to ${endDate}`);
+              console.log(`\u{1F50D} DEBUG: SKIPPED - Date ${dueDate} not in range ${startDate} to ${endDate}`);
               continue;
             }
           } else {
             if (dueDateObj.isBefore(moment().subtract(30, "days"))) {
-              console.log(`Date ${dueDate} is too far in the past`);
+              console.log(`\u{1F50D} DEBUG: SKIPPED - Date ${dueDate} is too far in the past`);
               continue;
             }
           }
           if (query && !assignment.toLowerCase().includes(query.toLowerCase())) {
+            console.log(`\u{1F50D} DEBUG: SKIPPED - Assignment doesn't match query "${query}"`);
             continue;
           }
-          const formattedAssignment = assignment.match(/[A-Z]{3}-[0-9]{3}/) ? assignment : `#${page["file.course_id"] || courseId || "unknown"} - ${assignment}`;
+          const formattedAssignment = assignment.match(/[A-Z]{3}-[0-9]{3}/) ? assignment : `#${filePath.split("/")[0] || courseId || "unknown"} - ${assignment}`;
+          console.log(`\u{1F50D} DEBUG: Formatted assignment: "${formattedAssignment}"`);
           let formattedDueDate = dueDate;
           if (dueDateObj.isAfter(moment().subtract(1, "week"))) {
             formattedDueDate = `<span class="due one_week">${dueDate}</span>`;
           } else if (dueDateObj.isAfter(moment().subtract(2, "week"))) {
             formattedDueDate = `<span class="due two_weeks">${dueDate}</span>`;
           }
-          console.log(`Pushing to entries: ${dueDate}, ${assignment}`);
+          console.log(`\u{1F50D} DEBUG: \u2705 ADDING ENTRY - dueDate: ${dueDate}, assignment: ${formattedAssignment}`);
           entries.push({
             dueDate,
             formattedDueDate,
             assignment: formattedAssignment,
-            filePath: page["file.path"]
+            filePath
           });
         }
       } catch (error) {
-        console.error(`Error processing file ${page["file.path"]}:`, error);
+        console.error(`\u{1F50D} DEBUG: Error processing file ${filePath}:`, error);
       }
     }
-    console.log(`Total entries found: ${entries.length}`);
+    console.log(`\u{1F50D} DEBUG: Total entries found: ${entries.length}`);
     entries.sort((a, b) => moment(a.dueDate).valueOf() - moment(b.dueDate).valueOf());
     return entries;
   }
